@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Gerak Parabola Pro - Planet Edition</title>
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- MathJax untuk Rumus Indah -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        canvas { 
+            image-rendering: crisp-edges;
+            touch-action: none;
+        }
+
+        .planet-btn {
+            @apply px-3 py-2 text-xl hover:bg-slate-700 rounded-lg transition-all flex flex-col items-center gap-1 border border-transparent;
+        }
+        .planet-btn.active {
+            @apply border-emerald-500 bg-slate-800 shadow-[0_0_10px_rgba(16,185,129,0.3)];
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 h-screen w-screen flex flex-col overflow-hidden">
+
+    <!-- Disclaimer Banner -->
+    <div class="bg-amber-900/40 border-b border-amber-700/30 text-amber-100 py-1.5 px-4 text-[11px] text-center font-semibold tracking-wide z-50">
+        ⚠️ PERHATIAN: Perhitungan di sini tidak 100% benar dan kamu perlu menghitung sesuai rumus yang sudah di berikan
+    </div>
+
+    <!-- Layout Wrapper -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full">
+
+    <!-- Sidebar / Control Panel -->
+    <aside class="w-full lg:w-96 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl z-20 overflow-y-auto max-h-screen">
+        
+        <div class="p-6 border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
+            <div class="flex items-center gap-2 mb-1">
+                <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                <h1 class="text-xl font-bold text-white tracking-tight">Physics Engine <span class="text-emerald-500">v2.1 Precision</span></h1>
+            </div>
+            <p class="text-xs text-slate-500">Fixed-Time Step Integrator (0.01s)</p>
+        </div>
+
+        <div class="p-6 space-y-6 flex-1">
+            
+            <!-- Kecepatan, Sudut, & Massa -->
+            <div class="grid grid-cols-1 gap-6">
+                <div class="group">
+                    <div class="flex justify-between text-sm mb-2">
+                        <label class="font-medium text-slate-300">Kecepatan Awal</label>
+                        <span class="font-mono text-emerald-400 bg-slate-800 px-2 rounded border border-slate-700"><span id="display-vo">60</span> m/s</span>
+                    </div>
+                    <input type="range" id="input-vo" min="5" max="150" value="60" step="1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+
+                <div class="group">
+                    <div class="flex justify-between text-sm mb-2">
+                        <label class="font-medium text-slate-300">Sudut Elevasi</label>
+                        <span class="font-mono text-emerald-400 bg-slate-800 px-2 rounded border border-slate-700"><span id="display-angle">45</span>°</span>
+                    </div>
+                    <input type="range" id="input-angle" min="0" max="90" value="45" step="1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+
+                <div class="group">
+                    <div class="flex justify-between text-sm mb-2">
+                        <label class="font-medium text-slate-300">Massa Objek</label>
+                        <span class="font-mono text-emerald-400 bg-slate-800 px-2 rounded border border-slate-700"><span id="display-mass">1.0</span> kg</span>
+                    </div>
+                    <input type="range" id="input-mass" min="0.1" max="10" value="1.0" step="0.1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    <p class="text-[10px] text-slate-500 mt-1">*Mempengaruhi hambatan udara (jika aktif)</p>
+                </div>
+            </div>
+
+            <!-- Planet Selection -->
+            <div>
+                <label class="text-sm font-medium text-slate-300 block mb-3">Pilih Lokasi (Gravitasi)</label>
+                <div class="grid grid-cols-4 gap-2" id="planet-grid">
+                    <button data-g="274" class="planet-btn" title="Matahari">☀️<span class="text-[8px] text-slate-500 mt-1 uppercase">Sun</span></button>
+                    <button data-g="3.7" class="planet-btn" title="Merkurius">☄️<span class="text-[8px] text-slate-500 mt-1 uppercase">Mer</span></button>
+                    <button data-g="8.87" class="planet-btn" title="Venus">☁️<span class="text-[8px] text-slate-500 mt-1 uppercase">Ven</span></button>
+                    <button data-g="9.8" class="planet-btn active" title="Bumi">🌍<span class="text-[8px] text-slate-500 mt-1 uppercase">Ear</span></button>
+                    <button data-g="1.62" class="planet-btn" title="Bulan">🌑<span class="text-[8px] text-slate-500 mt-1 uppercase">Moo</span></button>
+                    <button data-g="3.72" class="planet-btn" title="Mars">🪐<span class="text-[8px] text-slate-500 mt-1 uppercase">Mar</span></button>
+                    <button data-g="24.79" class="planet-btn" title="Jupiter">🌀<span class="text-[8px] text-slate-500 mt-1 uppercase">Jup</span></button>
+                    <button data-g="11.15" class="planet-btn" title="Neptunus">🔵<span class="text-[8px] text-slate-500 mt-1 uppercase">Nep</span></button>
+                </div>
+                <div class="mt-3 flex items-center bg-slate-800 rounded-lg border border-slate-700 p-2">
+                    <span class="text-xs text-slate-400 mr-2">Custom g:</span>
+                    <input type="number" id="input-gravity" value="9.8" step="0.1" class="flex-1 bg-transparent text-right font-mono text-sm focus:outline-none text-white">
+                    <span class="text-xs text-slate-500 ml-1">m/s²</span>
+                </div>
+            </div>
+
+            <!-- Toggles (Bounce & Drag) -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                    <div>
+                        <span class="text-sm font-bold text-white block">Mode Memantul</span>
+                        <span class="text-[10px] text-slate-500 uppercase">Restitusi 70%</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="check-bounce" class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                    <div>
+                        <span class="text-sm font-bold text-white block">Gesekan Udara</span>
+                        <span class="text-[10px] text-slate-500 uppercase">Dipengaruhi Massa</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="check-drag" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button id="btn-reset" class="px-4 py-3 rounded-lg border border-slate-600 text-slate-300 font-semibold hover:bg-slate-800 transition-all active:scale-95">Reset</button>
+                <button id="btn-launch" class="px-4 py-3 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-500 shadow-lg active:scale-95">LEMPAR</button>
+            </div>
+
+        </div>
+
+        <!-- Stats -->
+        <div class="bg-slate-800 p-6 border-t border-slate-700">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Telemetri Real-time</h3>
+            <div class="space-y-4 font-mono text-[11px]">
+                <div class="flex flex-col border-b border-slate-700/50 pb-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-slate-400">Jarak Maksimum</span>
+                        <span id="res-distance" class="text-emerald-400 font-bold text-sm">0.00 m</span>
+                    </div>
+                </div>
+                <div class="flex flex-col border-b border-slate-700/50 pb-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-slate-400">Tinggi Maksimum</span>
+                        <span id="res-height" class="text-blue-400 font-bold text-sm">0.00 m</span>
+                    </div>
+                </div>
+                <div class="flex flex-col pb-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-slate-400">Total Waktu</span>
+                        <span id="res-time" class="text-orange-400 font-bold text-sm">0.00 s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formula Dictionary -->
+        <div class="bg-slate-950 p-6 border-t border-slate-800">
+            <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-4">REFERENSI RUMUS (Vakum)</h3>
+            <div class="space-y-4 text-xs text-slate-400">
+                <div>
+                    <strong class="text-slate-200 block mb-1">Jarak Terjauh ($R$)</strong>
+                    $$R = \frac{v_0^2 \sin(2\theta)}{g}$$
+                </div>
+                <div>
+                    <strong class="text-slate-200 block mb-1">Tinggi Maksimum ($H$)</strong>
+                    $$H = \frac{v_0^2 \sin^2(\theta)}{2g}$$
+                </div>
+                <div>
+                    <strong class="text-slate-200 block mb-1">Waktu Terbang ($t_{tot}$)</strong>
+                    $$t_{tot} = \frac{2 v_0 \sin(\theta)}{g}$$
+                </div>
+                <div class="mt-2 text-[10px] italic text-slate-600 border-t border-slate-800 pt-2">
+                    *Catatan: Jika gesekan udara aktif, hasil simulasi akan lebih kecil dari rumus di atas karena adanya gaya hambat ($F_d \propto v^2$).
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Viewport -->
+    <main class="flex-1 relative bg-slate-950 overflow-hidden">
+        <canvas id="simCanvas" class="block w-full h-full"></canvas>
+        
+        <!-- Scale Indicator UI -->
+        <div class="absolute top-6 right-6 text-right pointer-events-none opacity-80">
+            <div class="text-[10px] text-slate-500">SKALA GRID</div>
+            <div class="text-2xl font-mono font-bold text-slate-700"><span id="scale-indicator">10</span> m</div>
+            <div class="w-24 h-1 bg-slate-700 mt-1 ml-auto"></div>
+        </div>
+        
+        <!-- Coordinates Info -->
+        <div class="absolute bottom-6 left-6 pointer-events-none bg-black/30 backdrop-blur-md p-2 rounded border border-white/5 text-[10px] font-mono">
+            <span class="text-slate-500">POSISI:</span> 
+            <span id="pos-x" class="text-white">0.0</span>, 
+            <span id="pos-y" class="text-white">0.0</span>
+            <span class="text-slate-500 ml-2">WAKTU:</span>
+            <span id="sim-time" class="text-white">0.00</span>s
+        </div>
+
+        <!-- Air Resistance Warning Overlay -->
+        <div id="drag-indicator" class="hidden absolute top-6 left-6 pointer-events-none bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-[10px] text-emerald-400 font-bold uppercase tracking-widest backdrop-blur-sm">
+            Gesekan Udara: AKTIF
+        </div>
+    </main>
+
+    </div> <!-- End Layout Wrapper -->
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = canvas.parentElement;
+
+        // Physics Constants
+        const DRAG_COEFFICIENT_FACTOR = 0.002; 
+        const FIXED_DT = 0.01; // 10ms fixed time step untuk presisi fisika
+
+        const state = {
+            // Inputs
+            v0: 60,
+            angle: 45,
+            mass: 1.0,
+            g: 9.8,
+            dragEnabled: true,
+            shouldBounce: false,
+            
+            // Simulation State
+            t: 0,
+            animationId: null,
+            isAnimating: false,
+            timeAccumulator: 0, // Akumulator untuk fixed time step
+            
+            // Physics State (Real-time integration variables)
+            posX: 0,
+            posY: 0,
+            velX: 0,
+            velY: 0,
+            
+            // Visuals
+            trail: [],
+            simSpeed: 3.0, 
+            scale: 1,
+            lastFrame: null,
+            
+            // Calculated for Scale
+            maxD: 0,
+            maxH: 0
+        };
+
+        const ui = {
+            vo: document.getElementById('input-vo'),
+            angle: document.getElementById('input-angle'),
+            mass: document.getElementById('input-mass'),
+            gravity: document.getElementById('input-gravity'),
+            bounce: document.getElementById('check-bounce'),
+            drag: document.getElementById('check-drag'),
+            dispVo: document.getElementById('display-vo'),
+            dispAngle: document.getElementById('display-angle'),
+            dispMass: document.getElementById('display-mass'),
+            btnLaunch: document.getElementById('btn-launch'),
+            btnReset: document.getElementById('btn-reset'),
+            resDistance: document.getElementById('res-distance'),
+            resHeight: document.getElementById('res-height'),
+            resTime: document.getElementById('res-time'),
+            scaleInd: document.getElementById('scale-indicator'),
+            posX: document.getElementById('pos-x'),
+            posY: document.getElementById('pos-y'),
+            simTime: document.getElementById('sim-time'),
+            planetBtns: document.querySelectorAll('.planet-btn'),
+            dragInd: document.getElementById('drag-indicator')
+        };
+
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+            
+            ui.vo.addEventListener('input', updateInputs);
+            ui.angle.addEventListener('input', updateInputs);
+            ui.mass.addEventListener('input', updateInputs);
+            ui.gravity.addEventListener('input', updateInputs);
+            ui.bounce.addEventListener('change', updateInputs);
+            ui.drag.addEventListener('change', updateInputs);
+            ui.btnLaunch.addEventListener('click', toggleLaunch);
+            ui.btnReset.addEventListener('click', resetSimulation);
+
+            ui.planetBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const gravity = parseFloat(btn.dataset.g);
+                    ui.gravity.value = gravity;
+                    ui.planetBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateInputs();
+                });
+            });
+
+            updateInputs();
+        }
+
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${container.clientWidth}px`;
+            canvas.style.height = `${container.clientHeight}px`;
+        }
+
+        function updateInputs() {
+            if(state.isAnimating) {
+                stopAnimation();
+            }
+            
+            state.v0 = parseFloat(ui.vo.value);
+            state.angle = parseFloat(ui.angle.value);
+            state.mass = parseFloat(ui.mass.value);
+            state.g = parseFloat(ui.gravity.value) || 9.8;
+            state.shouldBounce = ui.bounce.checked;
+            state.dragEnabled = ui.drag.checked;
+
+            ui.dispVo.textContent = state.v0;
+            ui.dispAngle.textContent = state.angle;
+            ui.dispMass.textContent = state.mass.toFixed(1);
+            
+            if(state.dragEnabled) {
+                ui.dragInd.classList.remove('hidden');
+            } else {
+                ui.dragInd.classList.add('hidden');
+            }
+
+            // Run Prediction to set Scale and Stats
+            const prediction = simulateTrajectory();
+            
+            state.maxD = prediction.maxDistance;
+            state.maxH = prediction.maxHeight;
+            state.ghostPath = prediction.points;
+
+            ui.resDistance.textContent = prediction.maxDistance.toFixed(2) + " m";
+            ui.resHeight.textContent = prediction.maxHeight.toFixed(2) + " m";
+            ui.resTime.textContent = prediction.flightTime.toFixed(2) + " s";
+
+            calculateScale();
+            draw();
+        }
+
+        // Logic fisika inti (dipisahkan agar bisa dipakai di simulasi real-time maupun prediksi ghost-path)
+        function calculatePhysicsStep(dt, px, py, vx, vy, currentT) {
+             let ax = 0;
+             let ay = -state.g;
+
+             if (state.dragEnabled) {
+                 const vSq = vx*vx + vy*vy;
+                 const v = Math.sqrt(vSq);
+                 // Drag force = -k * v^2 -> a = -(k/m) * v * vector_v
+                 const dragFactor = (DRAG_COEFFICIENT_FACTOR / state.mass) * v;
+                 ax -= dragFactor * vx;
+                 ay -= dragFactor * vy;
+             }
+
+             // Semi-Implicit Euler (Update velocity then position) - Lebih stabil
+             vx += ax * dt;
+             vy += ay * dt;
+             
+             px += vx * dt;
+             py += vy * dt;
+             currentT += dt;
+
+             return { px, py, vx, vy, currentT };
+        }
+
+        // Simulates the entire path accurately using same fixed timestep
+        function simulateTrajectory() {
+            let t = 0;
+            const rad = state.angle * Math.PI / 180;
+            let vx = state.v0 * Math.cos(rad);
+            let vy = state.v0 * Math.sin(rad);
+            let x = 0;
+            let y = 0;
+            let maxY = 0;
+            const points = [{x:0, y:0}];
+            let running = true;
+            let bounceCount = 0;
+            const maxBounces = state.shouldBounce ? 2 : 0;
+
+            while (running && t < 20) { 
+                const res = calculatePhysicsStep(FIXED_DT, x, y, vx, vy, t);
+                x = res.px;
+                y = res.py;
+                vx = res.vx;
+                vy = res.vy;
+                t = res.currentT;
+
+                if (y > maxY) maxY = y;
+
+                if (y <= 0) {
+                    y = 0;
+                    if (state.shouldBounce && bounceCount < maxBounces && Math.abs(vy) > 1) {
+                        vy = -vy * 0.7; 
+                        vx = vx * 0.7; 
+                        bounceCount++;
+                    } else {
+                        running = false;
+                    }
+                }
+                
+                // Simpan point setiap beberapa langkah agar tidak terlalu rapat
+                if (points.length < 500) { 
+                    points.push({x, y});
+                }
+            }
+
+            return {
+                maxDistance: x,
+                maxHeight: maxY,
+                flightTime: t,
+                points: points
+            };
+        }
+
+        function calculateScale() {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            const margin = 100;
+            const effectiveW = w - margin;
+            const effectiveH = h - margin;
+
+            const viewDist = Math.max(state.maxD * 1.2, 10);
+            const viewHeight = Math.max(state.maxH * 1.5, 10);
+
+            const scaleX = effectiveW / viewDist;
+            const scaleY = effectiveH / viewHeight;
+            
+            state.scale = Math.min(scaleX, scaleY);
+            
+            ui.scaleInd.textContent = "10";
+            const scaleBar = document.querySelector('.w-24.h-1');
+            if(scaleBar) scaleBar.style.width = `${10 * state.scale}px`;
+        }
+
+        function worldToCanvas(x, y) {
+            const offsetX = 60;
+            const offsetY = 60;
+            return {
+                x: offsetX + (x * state.scale),
+                y: (container.clientHeight - offsetY) - (y * state.scale)
+            };
+        }
+
+        function drawGrid() {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            ctx.clearRect(0, 0, w, h);
+            
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 0.5;
+            const step = (100/state.scale > 50) ? 50 : (100/state.scale < 5 ? 1 : 10);
+            
+            for(let x=0; x < 20000; x+=step) {
+                const pos = worldToCanvas(x, 0);
+                if(pos.x > w) break;
+                ctx.beginPath(); ctx.moveTo(pos.x, 0); ctx.lineTo(pos.x, h); ctx.stroke();
+            }
+            for(let y=0; y < 10000; y+=step) {
+                const pos = worldToCanvas(0, y);
+                if(pos.y < 0) break;
+                ctx.beginPath(); ctx.moveTo(0, pos.y); ctx.lineTo(w, pos.y); ctx.stroke();
+            }
+
+            const origin = worldToCanvas(0,0);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(w, origin.y); ctx.stroke();
+            ctx.fillStyle = '#475569';
+            ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, Math.PI*2); ctx.fill();
+        }
+
+        function drawGhostPath() {
+            if (state.isAnimating || !state.ghostPath) return;
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+
+            state.ghostPath.forEach((p, i) => {
+                const pos = worldToCanvas(p.x, p.y);
+                if (i === 0) ctx.moveTo(pos.x, pos.y);
+                else ctx.lineTo(pos.x, pos.y);
+            });
+            
+            ctx.stroke();
+            ctx.setLineDash([]); 
+        }
+
+        function draw() {
+            drawGrid();
+            drawGhostPath();
+
+            if (state.trail.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                state.trail.forEach((p, i) => {
+                    const cp = worldToCanvas(p.x, p.y);
+                    if(i===0) ctx.moveTo(cp.x, cp.y); else ctx.lineTo(cp.x, cp.y);
+                });
+                ctx.stroke();
+            }
+
+            // Draw Ball
+            const pos = worldToCanvas(state.posX, state.posY);
+            const ballRadius = 4 + state.mass; 
+            
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 15; 
+            ctx.shadowColor = '#10b981';
+            ctx.beginPath(); ctx.arc(pos.x, pos.y, ballRadius, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ui.posX.textContent = state.posX.toFixed(1);
+            ui.posY.textContent = state.posY.toFixed(1);
+            if(ui.simTime) ui.simTime.textContent = state.t.toFixed(2);
+        }
+
+        function updatePhysics(dt) {
+            const res = calculatePhysicsStep(dt, state.posX, state.posY, state.velX, state.velY, state.t);
+            state.posX = res.px;
+            state.posY = res.py;
+            state.velX = res.vx;
+            state.velY = res.vy;
+            state.t = res.currentT;
+
+            // Ground Collision Logic
+            if (state.posY <= 0 && state.velY < 0) {
+                state.posY = 0;
+                
+                if (Math.abs(state.velY) < 1.0 || !state.shouldBounce) {
+                    return false; // Stop simulation
+                } else {
+                    state.velY = -state.velY * 0.7; // Restitution
+                    state.velX = state.velX * 0.7; // Friction
+                }
+            } else if (state.posY < 0) {
+                 state.posY = 0;
+            }
+            
+            // Record trail (optimized: only record if distance changed enough or time passed)
+            state.trail.push({x: state.posX, y: state.posY});
+            if(state.trail.length > 2000) state.trail.shift();
+
+            return true;
+        }
+
+        function animate(timestamp) {
+            if (!state.isAnimating) return;
+            
+            if (!state.lastFrame) {
+                state.lastFrame = timestamp;
+                state.animationId = requestAnimationFrame(animate);
+                return;
+            }
+            
+            // Hitung berapa lama waktu berlalu sejak frame terakhir
+            let frameTime = (timestamp - state.lastFrame) / 1000;
+            state.lastFrame = timestamp;
+
+            // Safety cap: jika user pindah tab, frameTime bisa jadi sangat besar (misal 5 detik)
+            // Kita batasi agar fisika tidak "meledak"
+            if (frameTime > 0.1) frameTime = 0.1;
+
+            state.timeAccumulator += frameTime;
+
+            // FIXED TIME STEP LOOP
+            // Kita jalankan fisika dalam potongan-potongan kecil (0.01s) sampai "mengejar" waktu frame saat ini.
+            while (state.timeAccumulator >= FIXED_DT) {
+                // Skala waktu simulasi diterapkan di sini
+                const simulationStep = FIXED_DT * state.simSpeed;
+                
+                const keepRunning = updatePhysics(simulationStep);
+                if (!keepRunning) {
+                    finish();
+                    return;
+                }
+                
+                state.timeAccumulator -= FIXED_DT;
+            }
+
+            draw();
+            state.animationId = requestAnimationFrame(animate);
+        }
+
+        function toggleLaunch() {
+            if(state.isAnimating) {
+                stopAnimation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        function startSimulation() {
+            state.posX = 0;
+            state.posY = 0;
+            state.t = 0;
+            state.timeAccumulator = 0;
+            
+            const rad = state.angle * Math.PI / 180;
+            state.velX = state.v0 * Math.cos(rad);
+            state.velY = state.v0 * Math.sin(rad);
+
+            state.trail = [];
+            state.isAnimating = true;
+            state.lastFrame = null;
+            
+            ui.btnLaunch.textContent = "STOP";
+            ui.btnLaunch.classList.replace('bg-emerald-600', 'bg-red-600');
+            ui.btnLaunch.classList.replace('hover:bg-emerald-500', 'hover:bg-red-500');
+            
+            state.animationId = requestAnimationFrame(animate);
+        }
+
+        function stopAnimation() {
+            state.isAnimating = false;
+            cancelAnimationFrame(state.animationId);
+            ui.btnLaunch.textContent = "LANJUTKAN";
+            ui.btnLaunch.classList.replace('bg-red-600', 'bg-emerald-600');
+            ui.btnLaunch.classList.replace('hover:bg-red-500', 'hover:bg-emerald-500');
+        }
+
+        function finish() {
+            state.isAnimating = false;
+            cancelAnimationFrame(state.animationId);
+            ui.btnLaunch.textContent = "LEMPAR LAGI";
+            ui.btnLaunch.classList.replace('bg-red-600', 'bg-emerald-600');
+            ui.btnLaunch.classList.replace('hover:bg-red-500', 'hover:bg-emerald-500');
+            draw(); 
+        }
+
+        function resetSimulation() {
+            state.isAnimating = false;
+            cancelAnimationFrame(state.animationId);
+            state.posX = 0;
+            state.posY = 0;
+            state.velX = 0;
+            state.velY = 0;
+            state.t = 0;
+            state.trail = [];
+            ui.btnLaunch.textContent = "LEMPAR";
+            ui.btnLaunch.classList.remove('bg-red-600');
+            ui.btnLaunch.classList.add('bg-emerald-600');
+            updateInputs();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
